@@ -7,6 +7,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: irsy0304/devopslab
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
@@ -26,29 +27,23 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Build and push Docker image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         push: true
         tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: build
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install kubectl
-      uses: azure/setup-kubectl@v4
-
-    - name: Set up kubeconfig
-      run: |
-        mkdir -p $HOME/.kube
-        echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
-
     - name: Deploy to Kubernetes
+      env:
+        KUBECONFIG: /home/runner/.kube/config
       run: |
         kubectl apply -f deployment.yaml
         kubectl rollout status deployment/devopslab
@@ -56,4 +51,4 @@ jobs:
     - name: Get service URL
       run: |
         NODE_PORT=$(kubectl get svc devopslab -o jsonpath='{.spec.ports[0].nodePort}')
-        echo "Application available at: http://192.168.31.250:$NODE_PORT"
+        echo "✅ Application available at: http://192.168.31.250:$NODE_PORT"
